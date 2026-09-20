@@ -23,6 +23,7 @@ from .face_pointing import FacePointing
 from .fashion_mnist import FashionMNIST
 
 # from .celeb_a import CelebA
+# from .eurosat import EuroSAT  # WIP: _generate_examples not implemented yet
 from .fgvc_aircraft import FGVCAircraft
 from .flowers102 import Flowers102
 from .food101 import Food101
@@ -37,6 +38,7 @@ from .med_mnist import MedMNIST
 from .not_mnist import NotMNIST
 
 # from .mnist import MNIST
+# from .oxford_iiit_pet import OxfordIIITPet  # WIP: _generate_examples not implemented yet
 # from .places365_small import Places365Small
 from .rock_paper_scissor import RockPaperScissor
 from .shapes3d import Shapes3D
