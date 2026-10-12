@@ -1,7 +1,76 @@
+import io
+import tarfile
+
 import numpy as np
 from PIL import Image
 
 from stable_datasets.images import OxfordIIITPet
+from stable_datasets.schema import ClassLabel
+from stable_datasets.schema import Image as ImageFeature
+from stable_datasets.splits import Split
+
+
+def _builder():
+    # Bypass __new__ so no download/cache build happens.
+    inst = object.__new__(OxfordIIITPet)
+    inst.__init__()
+    return inst
+
+
+def _add_bytes(tar, name, data):
+    member = tarfile.TarInfo(name)
+    member.size = len(data)
+    tar.addfile(member, io.BytesIO(data))
+
+
+def test_oxford_iiit_pet_metadata():
+    builder = _builder()
+    info = builder.info
+
+    assert str(OxfordIIITPet.VERSION) == "1.0.0"
+    assert OxfordIIITPet.SOURCE["homepage"] == "https://www.robots.ox.ac.uk/~vgg/data/pets/"
+    assert set(OxfordIIITPet.SOURCE["assets"].keys()) == {"images", "annotations"}
+    # Asset keys aren't split names, so cache lookup must use the real splits.
+    assert builder._candidate_splits() == [Split.TRAIN, Split.TEST]
+
+    assert list(info.features.keys()) == ["image", "label"]
+    assert isinstance(info.features["image"], ImageFeature)
+    assert isinstance(info.features["label"], ClassLabel)
+    assert info.features["label"].names == OxfordIIITPet._labels()
+    assert len(info.features["label"].names) == 37
+    assert info.supervised_keys == ("image", "label")
+
+
+def test_oxford_iiit_pet_generate_examples_matches_info(tmp_path):
+    """Smoke-test _generate_examples on tiny synthetic archives mirroring the real layout."""
+    builder = _builder()
+    names = builder.info.features["label"].names
+
+    images_path = tmp_path / "images.tar.gz"
+    with tarfile.open(images_path, "w:gz") as tar:
+        for image_id in ["Abyssinian_1", "basset_hound_2", "yorkshire_terrier_3"]:
+            buf = io.BytesIO()
+            Image.new("RGB", (32, 24), color=(10, 20, 30)).save(buf, format="JPEG")
+            _add_bytes(tar, f"images/{image_id}.jpg", buf.getvalue())
+        _add_bytes(tar, "images/broken_4.jpg", b"not a jpeg")
+
+    annotations_path = tmp_path / "annotations.tar.gz"
+    with tarfile.open(annotations_path, "w:gz") as tar:
+        _add_bytes(tar, "annotations/trainval.txt", b"#comment\nAbyssinian_1 1 1 1\nbasset_hound_2 15 2 3\n")
+        _add_bytes(tar, "annotations/test.txt", b"yorkshire_terrier_3 37 2 25\n")
+
+    path_map = {"images": images_path, "annotations": annotations_path}
+    train = list(builder._generate_examples(path_map=path_map, split="trainval"))
+    test = list(builder._generate_examples(path_map=path_map, split="test"))
+
+    assert [key for key, _ in train] == ["Abyssinian_1", "basset_hound_2"]
+    assert [key for key, _ in test] == ["yorkshire_terrier_3"]
+    for key, example in train + test:
+        assert set(example.keys()) == set(builder.info.features.keys())
+        assert isinstance(example["image"], Image.Image)
+        assert example["image"].mode == "RGB"
+        assert isinstance(example["label"], int)
+        assert names[example["label"]] == key.rsplit("_", 1)[0]
 
 
 def test_oxford_iiit_pet_dataset():

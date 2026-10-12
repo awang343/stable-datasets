@@ -1,7 +1,60 @@
+import io
+import zipfile
+
 import numpy as np
 from PIL import Image
 
 from stable_datasets.images import EuroSAT
+from stable_datasets.schema import ClassLabel
+from stable_datasets.schema import Image as ImageFeature
+
+
+def _builder():
+    # Bypass __new__ so no download/cache build happens.
+    inst = object.__new__(EuroSAT)
+    inst.__init__()
+    return inst
+
+
+def test_eurosat_metadata():
+    builder = _builder()
+    info = builder.info
+
+    assert str(EuroSAT.VERSION) == "1.0.0"
+    assert EuroSAT.SOURCE["homepage"] == "https://github.com/phelber/EuroSAT"
+    assert set(EuroSAT.SOURCE["assets"].keys()) == {"train"}
+
+    assert list(info.features.keys()) == ["image", "label"]
+    assert isinstance(info.features["image"], ImageFeature)
+    assert isinstance(info.features["label"], ClassLabel)
+    assert info.features["label"].names == EuroSAT._labels()
+    assert len(info.features["label"].names) == 10
+    assert info.supervised_keys == ("image", "label")
+
+
+def test_eurosat_generate_examples_matches_info(tmp_path):
+    """Smoke-test _generate_examples on a tiny synthetic archive mirroring the real layout."""
+    builder = _builder()
+    names = builder.info.features["label"].names
+
+    zip_path = tmp_path / "EuroSAT.zip"
+    with zipfile.ZipFile(zip_path, "w") as z:
+        for name in names[:3]:
+            buf = io.BytesIO()
+            Image.new("RGB", (64, 64), color=(10, 20, 30)).save(buf, format="JPEG")
+            z.writestr(f"2750/{name}/{name}_1.jpg", buf.getvalue())
+        z.writestr("2750/README.txt", "not an image")
+        z.writestr("2750/UnknownClass/UnknownClass_1.jpg", b"ignored")
+
+    examples = list(builder._generate_examples(data_path=zip_path, split="train"))
+
+    assert len(examples) == 3
+    for key, example in examples:
+        assert set(example.keys()) == set(builder.info.features.keys())
+        assert isinstance(example["image"], Image.Image)
+        assert example["image"].mode == "RGB"
+        assert isinstance(example["label"], int)
+        assert names[example["label"]] == key.split("/")[-2]
 
 
 def test_eurosat_dataset():
