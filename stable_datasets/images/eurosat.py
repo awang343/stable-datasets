@@ -1,22 +1,26 @@
+import zipfile
+
+from PIL import Image as PILImage
+
 from stable_datasets.schema import ClassLabel, DatasetInfo, DatasetSource, DownloadInfo, Features, Version
 from stable_datasets.schema import Image as ImageFeature
-from stable_datasets.splits import Split, SplitGenerator
-from stable_datasets.utils import BaseDatasetBuilder, bulk_download
+from stable_datasets.utils import BaseDatasetBuilder
 
 
 class EuroSAT(BaseDatasetBuilder):
     """
     EuroSAT Dataset
 
-    STATUS: work in progress, claimed for CSCI 2952X course project.
-    _split_generators / _generate_examples are not implemented yet.
-
     Abstract
     A land use / land cover classification dataset built from Sentinel-2
     satellite imagery, covering 10 classes with 27,000 labeled 64x64 RGB
-    images in total. There is no official train/test split; a fixed random
-    split (or the commonly used 80/20 split from follow-up benchmarks) needs
-    to be chosen here.
+    images in total.
+
+    There is no official train/val/test split shipped with the archive
+    (images are organized one folder per class). This builder exposes a
+    single "train" split with every image; benchmarks/dataset.py already
+    holds out 10% of "train" as validation when a dataset has no
+    separate val/test split (see AWA2, which follows the same pattern).
     """
 
     VERSION = Version("1.0.0")
@@ -29,8 +33,14 @@ class EuroSAT(BaseDatasetBuilder):
                          journal={IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing},
                          year={2019}}""",
         assets={
-            # RGB-only version (there is also a 13-band multispectral .npy release).
-            "images": DownloadInfo(url="https://madm.dfki.de/files/sentinel/EuroSAT.zip"),
+            # RGB-only version (there is also a 13-band multispectral release).
+            # The original host (madm.dfki.de) was unreachable (connection
+            # timeout) as of 2026-10-12, so this mirror is primary with the
+            # original kept as a fallback.
+            "train": DownloadInfo(
+                url="https://huggingface.co/datasets/torchgeo/eurosat/resolve/main/EuroSAT.zip",
+                fallbacks=["https://madm.dfki.de/files/sentinel/EuroSAT.zip"],
+            ),
         },
     )
 
@@ -48,30 +58,28 @@ class EuroSAT(BaseDatasetBuilder):
             citation=self.SOURCE["citation"],
         )
 
-    def _split_generators(self):
-        source = self._source()
+    def _generate_examples(self, data_path, split):
+        class_names = self.info.features["label"].names
+        label_mapping = {name: idx for idx, name in enumerate(class_names)}
 
-        local_paths = bulk_download([source["assets"]["images"]], dest_folder=self._raw_download_dir)
-        path_map = {"images": local_paths[0]}
+        with zipfile.ZipFile(data_path, "r") as z:
+            for path in z.namelist():
+                if not path.lower().endswith((".jpg", ".jpeg")):
+                    continue
+                # Images live at "<archive_root>/<ClassName>/<ClassName>_<idx>.jpg".
+                # We key off the immediate parent folder name rather than a
+                # hardcoded root (e.g. "2750/") so a differently-named release
+                # of the archive still resolves correctly.
+                parts = path.split("/")
+                if len(parts) < 2:
+                    continue
+                class_name = parts[-2]
+                if class_name not in label_mapping:
+                    continue
 
-        # TODO: no official split ships with the archive (it's one folder per
-        # class). Decide + document a fixed train/val/test split here (e.g.
-        # a seeded random split) so results are reproducible across re-runs.
-        return [
-            SplitGenerator(
-                name=Split.TRAIN,
-                gen_kwargs={"path_map": path_map, "split": "train"},
-            ),
-            SplitGenerator(
-                name=Split.TEST,
-                gen_kwargs={"path_map": path_map, "split": "test"},
-            ),
-        ]
-
-    def _generate_examples(self, path_map, split):
-        # TODO: unzip EuroSAT.zip, walk the per-class subfolders (one per
-        # entry in `_labels()`), decode JPEGs, and apply the chosen split.
-        raise NotImplementedError("EuroSAT._generate_examples is not implemented yet.")
+                with z.open(path) as image_file:
+                    image = PILImage.open(image_file).convert("RGB")
+                    yield path, {"image": image, "label": label_mapping[class_name]}
 
     @staticmethod
     def _labels():
