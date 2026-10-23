@@ -23,6 +23,10 @@ already holds out 10% of ``train`` as validation whenever a dataset has
 no separate val/test split (the same handling used for AWA2), so this
 builder simply exposes the full dataset as a single ``train`` split.
 
+.. image:: teasers/eurosat_teaser.png
+   :align: center
+   :width: 90%
+
 Data Structure
 --------------
 

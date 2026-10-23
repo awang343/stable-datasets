@@ -24,6 +24,10 @@ This builder only consumes the per-image breed label; the upstream
 annotation archive also ships trimap segmentations and bounding boxes,
 which are not exposed here.
 
+.. image:: teasers/oxford_iiit_pet_teaser.png
+   :align: center
+   :width: 90%
+
 Data Structure
 --------------
 
