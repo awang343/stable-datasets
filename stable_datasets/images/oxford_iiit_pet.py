@@ -34,6 +34,8 @@ class OxfordIIITPet(BaseDatasetBuilder):
             "images": DownloadInfo(url="https://www.robots.ox.ac.uk/~vgg/data/pets/data/images.tar.gz"),
             "annotations": DownloadInfo(url="https://www.robots.ox.ac.uk/~vgg/data/pets/data/annotations.tar.gz"),
         },
+        # Annotations are CC BY-SA 4.0; image copyright remains with the original owners.
+        license="CC BY-SA 4.0",
     )
 
     def _info(self):
@@ -47,6 +49,7 @@ class OxfordIIITPet(BaseDatasetBuilder):
             ),
             supervised_keys=("image", "label"),
             homepage=self.SOURCE["homepage"],
+            license=self.SOURCE["license"],
             citation=self.SOURCE["citation"],
         )
 
@@ -87,21 +90,16 @@ class OxfordIIITPet(BaseDatasetBuilder):
             f = ann_tar.extractfile(list_file)
             lines = f.read().decode("utf-8").splitlines()
 
-        # Each non-comment line is "<image_id> <class_id> <species> <breed_id>".
-        # We only need image_id; the breed name is recovered from it directly
-        # (image ids look like "Abyssinian_100" or "basset_hound_112") so we
-        # don't have to trust that the numeric class_id ordering lines up with
-        # our own `_labels()` ordering.
-        breed_to_label = {name: idx for idx, name in enumerate(self._labels())}
+        # Each non-comment line is "<image_id> <class_id> <species> <breed_id>",
+        # where class_id is the official 1-based breed id (1..37). Labels are
+        # class_id - 1, so they line up with the order of `_labels()`.
         id_to_label = {}
         for line in lines:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            image_id = line.split()[0]
-            breed = image_id.rsplit("_", 1)[0]
-            if breed in breed_to_label:
-                id_to_label[image_id] = breed_to_label[breed]
+            image_id, class_id = line.split()[:2]
+            id_to_label[image_id] = int(class_id) - 1
 
         with tarfile.open(images_path, "r:gz") as img_tar:
             for member in img_tar:
@@ -114,37 +112,26 @@ class OxfordIIITPet(BaseDatasetBuilder):
                 f = img_tar.extractfile(member)
                 if f is None:
                     continue
-                image_bytes = f.read()
-                try:
-                    image = PILImage.open(io.BytesIO(image_bytes)).convert("RGB")
-                except OSError:
-                    # A small number of upstream JPEGs are truncated/corrupt.
-                    continue
+                image = PILImage.open(io.BytesIO(f.read())).convert("RGB")
 
                 yield image_id, {"image": image, "label": id_to_label[image_id]}
 
     @staticmethod
     def _labels():
-        """37 breed names, in the order used by the dataset's own annotation files."""
+        """37 breed names, indexed by official class id - 1 (annotations/list.txt CLASS-ID 1..37)."""
         return [
             "Abyssinian",
-            "Bengal",
-            "Birman",
-            "Bombay",
-            "British_Shorthair",
-            "Egyptian_Mau",
-            "Maine_Coon",
-            "Persian",
-            "Ragdoll",
-            "Russian_Blue",
-            "Siamese",
-            "Sphynx",
             "american_bulldog",
             "american_pit_bull_terrier",
             "basset_hound",
             "beagle",
+            "Bengal",
+            "Birman",
+            "Bombay",
             "boxer",
+            "British_Shorthair",
             "chihuahua",
+            "Egyptian_Mau",
             "english_cocker_spaniel",
             "english_setter",
             "german_shorthaired",
@@ -153,14 +140,20 @@ class OxfordIIITPet(BaseDatasetBuilder):
             "japanese_chin",
             "keeshond",
             "leonberger",
+            "Maine_Coon",
             "miniature_pinscher",
             "newfoundland",
+            "Persian",
             "pomeranian",
             "pug",
+            "Ragdoll",
+            "Russian_Blue",
             "saint_bernard",
             "samoyed",
             "scottish_terrier",
             "shiba_inu",
+            "Siamese",
+            "Sphynx",
             "staffordshire_bull_terrier",
             "wheaten_terrier",
             "yorkshire_terrier",

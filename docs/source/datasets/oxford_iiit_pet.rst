@@ -6,7 +6,7 @@ Oxford-IIIT Pet
    <p style="display: flex; gap: 10px;">
    <img src="https://img.shields.io/badge/Task-Fine--Grained%20Classification-blue" alt="Task: Fine-Grained Classification">
    <img src="https://img.shields.io/badge/Classes-37-green" alt="Classes: 37">
-   <img src="https://img.shields.io/badge/Images-~7390-purple" alt="Images: ~7390">
+   <img src="https://img.shields.io/badge/Size-Variable-orange" alt="Image Size: Variable">
    </p>
 
 Overview
@@ -17,8 +17,8 @@ breeds, 25 dog breeds) with roughly 200 images per class. Images vary
 widely in scale, pose, and lighting, making it a standard fine-grained
 classification and linear-probe transfer benchmark.
 
-- **Train** (``trainval``): ~3,680 images
-- **Test**: ~3,669 images
+- **Train** (``trainval``): 3,680 images
+- **Test**: 3,669 images
 
 This builder only consumes the per-image breed label; the upstream
 annotation archive also ships trimap segmentations and bounding boxes,
@@ -46,7 +46,7 @@ with the following keys:
      - RGB image (variable dimensions)
    * - ``label``
      - int
-     - Breed label (0-36)
+     - Breed label (0-36), equal to the official class id minus 1
 
 Usage Example
 --------------
@@ -69,8 +69,9 @@ Usage Example
 References
 ----------
 
-- Homepage: https://www.robots.ox.ac.uk/~vgg/data/pets/
+- Official website: https://www.robots.ox.ac.uk/~vgg/data/pets/
 - Paper: Cats and Dogs (CVPR 2012)
+- License: CC BY-SA 4.0 (copyright of the images remains with their original owners)
 
 Citation
 --------

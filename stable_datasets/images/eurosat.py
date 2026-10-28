@@ -17,10 +17,8 @@ class EuroSAT(BaseDatasetBuilder):
     images in total.
 
     There is no official train/val/test split shipped with the archive
-    (images are organized one folder per class). This builder exposes a
-    single "train" split with every image; benchmarks/dataset.py already
-    holds out 10% of "train" as validation when a dataset has no
-    separate val/test split (see AWA2, which follows the same pattern).
+    (images are organized one folder per class), so this builder exposes a
+    single "train" split with every image (the same pattern as AWA2).
     """
 
     VERSION = Version("1.0.0")
@@ -42,6 +40,8 @@ class EuroSAT(BaseDatasetBuilder):
                 fallbacks=["https://madm.dfki.de/files/sentinel/EuroSAT.zip"],
             ),
         },
+        # Imagery also falls under the Copernicus Sentinel Data Terms and Conditions.
+        license="MIT License",
     )
 
     def _info(self):
@@ -55,6 +55,7 @@ class EuroSAT(BaseDatasetBuilder):
             ),
             supervised_keys=("image", "label"),
             homepage=self.SOURCE["homepage"],
+            license=self.SOURCE["license"],
             citation=self.SOURCE["citation"],
         )
 

@@ -38,6 +38,13 @@ def test_oxford_iiit_pet_metadata():
     assert isinstance(info.features["label"], ClassLabel)
     assert info.features["label"].names == OxfordIIITPet._labels()
     assert len(info.features["label"].names) == 37
+    # Index i must be official class id i + 1 (annotations/list.txt).
+    names = info.features["label"].names
+    assert names[0] == "Abyssinian"
+    assert names[3] == "basset_hound"
+    assert names[5] == "Bengal"
+    assert names[26] == "Ragdoll"
+    assert names[36] == "yorkshire_terrier"
     assert info.supervised_keys == ("image", "label")
 
 
@@ -56,7 +63,7 @@ def test_oxford_iiit_pet_generate_examples_matches_info(tmp_path):
 
     annotations_path = tmp_path / "annotations.tar.gz"
     with tarfile.open(annotations_path, "w:gz") as tar:
-        _add_bytes(tar, "annotations/trainval.txt", b"#comment\nAbyssinian_1 1 1 1\nbasset_hound_2 15 2 3\n")
+        _add_bytes(tar, "annotations/trainval.txt", b"#comment\nAbyssinian_1 1 1 1\nbasset_hound_2 4 2 3\n")
         _add_bytes(tar, "annotations/test.txt", b"yorkshire_terrier_3 37 2 25\n")
 
     path_map = {"images": images_path, "annotations": annotations_path}
@@ -76,9 +83,8 @@ def test_oxford_iiit_pet_generate_examples_matches_info(tmp_path):
 def test_oxford_iiit_pet_dataset():
     pets_train = OxfordIIITPet(split="train")
 
-    # Test 1: Non-empty, roughly the known trainval size (3680 images).
-    assert len(pets_train) > 0, "Expected non-empty training split."
-    assert 3000 <= len(pets_train) <= 3680, f"Unexpected trainval split size: {len(pets_train)}."
+    # Test 1: Exact official trainval size.
+    assert len(pets_train) == 3680, f"Expected 3680 training images, got {len(pets_train)}."
 
     # Test 2: Check sample keys
     sample = pets_train[0]
@@ -98,6 +104,6 @@ def test_oxford_iiit_pet_dataset():
     assert isinstance(label, int), f"Label should be int, got {type(label)}."
     assert 0 <= label < 37, f"Label should be in range [0, 36], got {label}."
 
-    # Test 5: Test split, roughly the known size (3669 images).
+    # Test 5: Exact official test size.
     pets_test = OxfordIIITPet(split="test")
-    assert 3000 <= len(pets_test) <= 3669, f"Unexpected test split size: {len(pets_test)}."
+    assert len(pets_test) == 3669, f"Expected 3669 test images, got {len(pets_test)}."
